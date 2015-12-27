@@ -1,0 +1,101 @@
+---
+title: "PML-Assignment-Writeup"
+author: "Jonathan Isernhagen"
+date: "December 26, 2015"
+output: html_document
+---
+
+###Synopsis
+We have been asked to analyze a data set of metrics related to the performance of weight-lifting physical exercises, with each corresponding to:
+A) a properly-performed exercise, or;
+B-E) an exercise improperly-performed in a specific way.
+Our task is to use any and all useful metrics to ascertain which category "bucket" of correct or incorrect exercise each observation belongs to, and predict the A-E category for a set of twenty new observations with the highest possible degree of accuracy.  Our preference in this context is for accuracy over interpretability or scalability.
+
+###Executive Summary
+After deleting all variables which contained few or no values in order to concentrate the algorithms' efforts on useful data of manageable size, and creating and testing a number of algorithms, we determined:
+
+###Analyses 
+**Exploratory Analysis:** 
+
+We first installed the caret package, ggplot2 for charting and dplyr for data manipulation, then imported the "training" (which we labeled as training.and.testing) and "testing" (which we labeled "validation") data sets.
+```{R message=FALSE, error=FALSE, warning=FALSE}
+require(caret); require(randomForest); require(ggplot2); require(dplyr)
+training.and.testing<-read.csv("pml-training.csv")
+validation<-read.csv("pml-testing.csv")
+```
+
+....and used str to observe their characteristics (Appendix A).  The training.and.testing set includes 19,622 observations of 160 variables, qualifying it as a "large" data set.  It was apparent that many columns of both data sets contained data for only a small minority of observations.  Attempting to fit a random forest model against the un-edited data set took > 1 hour, so we decided to delete all non-exercise-performance-related (e.g. timestamp) and all sparsely-populated columns, and then make other changes necessary to align the two data sets:
+```{r}
+training.and.testing.cut<-select(training.and.testing, new_window:total_accel_belt, gyros_belt_x:total_accel_arm, gyros_arm_x:magnet_arm_z, roll_dumbbell:yaw_dumbbell, total_accel_dumbbell, gyros_dumbbell_x:yaw_forearm, total_accel_forearm, gyros_forearm_x:magnet_forearm_z, classe) 
+validation.cut<-select(validation, new_window:total_accel_belt, gyros_belt_x:total_accel_arm, gyros_arm_x:magnet_arm_z, roll_dumbbell:yaw_dumbbell, total_accel_dumbbell, gyros_dumbbell_x:yaw_forearm, total_accel_forearm, gyros_forearm_x:magnet_forearm_z)
+validation.cut$magnet_forearm_y<-as.numeric(validation.cut$magnet_forearm_y)
+validation.cut$magnet_forearm_z<-as.numeric(validation.cut$magnet_forearm_z)
+levels(validation.cut$new_window) <- c("no", "yes")
+```
+
+We then divided the "training.and.testing" data set into "training" and "testing" partitions.
+```{r}
+inTrain<-createDataPartition(y=training.and.testing.cut$classe, p = 0.6, list = FALSE)
+training<-training.and.testing.cut[inTrain,]
+testing<-training.and.testing.cut[-inTrain,]
+```
+
+**Model #1:  random forest, no preprocessing:** Our first model is a simple random forest.  Evoking the random forest from within caret (modelFit<-train(classe ~ ., data = training, method="rf")) took too long, so we did it directly.
+```{r}
+set.seed(1)
+modelFit<-randomForest(classe ~ ., data = training)
+modelFit
+```
+
+**Diagnostics:** 
+The model's error OOB error rate is 0.32%.  When applied to the testing data set, the confusion matrix appears as follows:
+
+```{r}
+predictions<-predict(modelFit, newdata=testing)
+confusionMatrix(predictions, testing$classe)
+```
+...which showed an encouragingly very low error rate, and gave us the confidence to proceed directly to the validation phase.
+
+The predictions achieved when applying the model to the validation set were as follows:
+```{r}
+predictions<-predict(modelFit, newdata=validation.cut)
+predictions
+```
+
+...which turned out to be 100% correct.  
+
+###Conclusions
+We came to the exercise prepared to test a wide variety of models and methods to achieve high predictive accuracy, but the very first model we tried, with minimal, common-sense shaping of the data, provided a model sufficiently accurate for us to score 100% of the validation observations successfully, so we stopped the exercise and are submitting these findings.
+
+###Appendices:
+**Appendix A:  str(Training) and str(Validation)**
+```{r}
+str(training)
+str(testing)
+```
+
+**Appendix B:  (empty shell with echo syntax)** 
+```{R echo=FALSE, message=FALSE, error=FALSE, warning=FALSE}
+
+```
+
+**Appendix C:  (empty shell with chart formatting)**
+```{R fig.height = 5, fig.width = 10}
+
+```
+
+**Appendix D:  (instructions and overflow)**
+Sequence:  Question->Input Data->Features->Algorithm->Parameters->Evaluation
+
+1. Your submission should consist of a link to a Github repo with your R markdown and compiled HTML file describing your analysis. Please constrain the text of the writeup to < 2000 words and the number of figures to be less than 5. It will make it easier for the graders if you submit a repo with a gh-pages branch so the HTML page can be viewed online (and you always want to make it easy on graders :-).
+2. You should also apply your machine learning algorithm to the 20 test cases available in the test data above. Please submit your predictions in appropriate format to the programming assignment for automated grading. See the programming assignment for additional details. 
+
+Receiver Operating Characteristic (area under the curve)
+
+How you built your model, how you used cross validation, what you think the expected out of sample error is, and why you made the choices you did. You will also use your prediction model to predict 20 different test cases. 
+
+			i. preprocessing tools in the caret package to clean data and get the features set up, so that they can be used for prediction. 
+			ii. We can also do, sort of cross validation and data splitting within the training set, using the createDataPartition and createTimeSlices functions. 
+			iii. We can also create training and test sets with the training and predict functions. 
+			iv. And we can use those to train data sets at train prediction functions and apply them to new data sets. 
+			v. We can also do model comparison using the confusion matrix function, which will give you information about how well the models did on new data sets. 
